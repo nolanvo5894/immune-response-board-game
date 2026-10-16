@@ -87,8 +87,6 @@ function render() {
   renderActions(p);
   renderHand(p);
   $('hint').textContent = typeof G.tutorial === 'number' ? '' : hintText(p);
-  $('log').innerHTML = G.log.slice(-40).map(l => `<p class="${l.kind}">${l.text}</p>`).join('');
-  $('log').scrollTop = $('log').scrollHeight;
   renderCoach();
   save();
 }

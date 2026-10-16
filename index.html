@@ -91,7 +91,7 @@ body.playing { overflow: hidden; }
 .turn { flex-wrap: wrap; row-gap: 2px; }
 .table { display: grid; grid-template-columns: 250px minmax(0, 1fr) 310px; grid-template-areas: "rail board cmd"; gap: 14px; align-items: stretch; grid-template-rows: minmax(0, 1fr); justify-content: center; }
 .rail { grid-area: rail; display: grid; gap: 10px; align-content: start; min-height: 0; overflow: auto; }
-.cmd { grid-area: cmd; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); gap: 10px; min-height: 0; }
+.cmd { grid-area: cmd; display: grid; grid-template-rows: auto auto auto; align-content: start; gap: 10px; min-height: 0; }
 .log-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
 .log-wrap .log { max-height: none; }
 .board-wrap { grid-area: board; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; gap: 8px; min-width: 0; min-height: 0; }
@@ -452,7 +452,6 @@ body.playing { overflow: hidden; }
         <div class="me-card" id="me"></div>
         <div class="inspect" id="inspect" aria-live="polite"></div>
         <div class="hint" id="hint"></div>
-        <section class="log-wrap"><div class="label">Body events</div><div class="log" id="log" aria-live="polite"></div></section>
       </aside>
     </div>
   </section>
@@ -468,4 +467,4 @@ body.playing { overflow: hidden; }
   </div>
 </aside>
 
-<script type="module" src="js/ui.js?v=35"></script>
+<script type="module" src="js/ui.js?v=36"></script>
