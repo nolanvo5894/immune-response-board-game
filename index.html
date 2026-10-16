@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Immune Response</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap">
+<style>
+/* Layout: one-screen game table. Board (microscope view) left, hero console right; stacks on phones.
+   Single dark look on purpose: it matches the painted art, which is all on deep navy. */
+:root {
+  color-scheme: dark;
+  --ink: #0e1228;        /* page ground, slightly bluer than the art navy */
+  --navy: #141a33;       /* art background */
+  --panel: #1b2244;      /* raised surfaces */
+  --line: #2f3866;       /* borders, vessels at rest */
+  --text: #f3ecdf;       /* cream highlight from the art */
+  --muted: #a9acc8;
+  --vessel: #ff7a8a;     /* blood vessel glow */
+  --cancer: #e2384a;
+  --gold: #ffc85a;       /* cytokine / action pips */
+  --good: #5fe0b0;
+  --lymph: #7ef0c8;    /* lymph vessels and nodes */
+  --dendritic: #b9a3ff; --killer_t: #3fd0c9; --nk: #ff5fa8; --macrophage: #ffb23f;
+  --display: "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  --r: 14px;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--ink); color: var(--text); font: 15px/1.45 var(--body); }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.05; margin: 0; text-wrap: balance; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.wrap { max-width: 1440px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 24px; }
+
+/* ---------- start screen ---------- */
+#start { display: grid; gap: 20px; }
+.hero { position: relative; border-radius: 22px; overflow: hidden; aspect-ratio: 3 / 2; max-height: 62vh; width: 100%; background: var(--navy) center / cover no-repeat; box-shadow: 0 20px 60px #0008; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, #0e1228cc 0%, #0e122800 45%), linear-gradient(180deg, #0e122800 50%, #0e1228cc 100%); }
+.hero .logo { position: absolute; left: clamp(16px, 4vw, 48px); top: clamp(14px, 4vw, 44px); z-index: 1; }
+.logo h1 { font-size: clamp(2.4rem, 7vw, 5.4rem); font-weight: 800; letter-spacing: -.01em; color: var(--text); text-shadow: 0 4px 0 #0e1228, 0 0 30px #ff5fa866; }
+.logo h1 span { color: var(--killer_t); }
+.logo p { margin: 4px 0 0; font-weight: 700; color: var(--text); max-width: 34ch; text-shadow: 0 2px 8px #000c; }
+.setup { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
+.team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.role-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+.role-card img { aspect-ratio: 1; width: 100%; object-fit: cover; display: block; background: var(--navy); }
+.role-card div { padding: 10px 12px 12px; display: grid; gap: 4px; align-content: start; }
+.role-card h3 { font-size: 1.15rem; }
+.role-card p { margin: 0; font-size: .82rem; color: var(--muted); }
+.role-card p b { color: var(--text); font-weight: 700; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; }
+.label { font: 700 .72rem/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { flex: 1; min-width: 80px; padding: 10px 8px; border-radius: 10px; background: var(--navy); border: 1px solid var(--line); font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
+.seg button[aria-pressed="true"] { background: var(--text); color: var(--ink); border-color: var(--text); }
+.seg small { display: block; font: 600 .72rem var(--body); opacity: .75; }
+.big { padding: 14px 18px; border-radius: 12px; border: 0; background: linear-gradient(180deg, #ff6f86, var(--cancer)); color: #fff; font: 800 1.3rem var(--display); box-shadow: 0 6px 0 #8c1a2a; transition: transform .1s; }
+.big:active { transform: translateY(3px); box-shadow: 0 3px 0 #8c1a2a; }
+.ghost { padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: transparent; font-weight: 700; }
+.rules { font-size: .88rem; color: var(--muted); display: grid; gap: 8px; }
+.rules ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.rules b { color: var(--text); }
+
+/* ---------- game screen ----------
+   Layout: three columns on desktop. Left rail = the situation (threat, lymph nodes, team).
+   Center = the body, full viewport height. Right = the active cell's command panel. */
+#game { display: grid; gap: 10px; }
+body.playing .wrap { max-width: none; padding-block: 10px; height: 100dvh; }
+body.playing #game { height: 100%; grid-template-rows: auto minmax(0, 1fr); }
+body.playing .table { height: 100%; min-height: 0; }
+body.playing { overflow: hidden; }
+/* short screens: drop explanatory captions so the side columns still fit without scrolling */
+@media (max-height: 820px) and (min-width: 761px) {
+  .rail .cap, #s-rate { display: none !important; }
+  .meter { gap: 3px; }
+}
+@media (max-height: 760px) and (min-width: 761px) {
+}
+@media (max-width: 760px) { body.playing { overflow: auto; } }
+.gbar { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
+.brand { font: 800 1.45rem/1 var(--display); }
+.brand span { color: var(--killer_t); }
+.turn { margin-right: auto; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; }
+.turn img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid var(--c); }
+.turn b { color: var(--c); font-family: var(--display); font-size: 1.05rem; }
+.turn span, .turn b { white-space: nowrap; }
+.turn { flex-wrap: wrap; row-gap: 2px; }
+.table { display: grid; grid-template-columns: 250px minmax(0, 1fr) 310px; grid-template-areas: "rail board cmd"; gap: 14px; align-items: stretch; grid-template-rows: minmax(0, 1fr); justify-content: center; }
+.rail { grid-area: rail; display: grid; gap: 10px; align-content: start; min-height: 0; overflow: auto; }
+.cmd { grid-area: cmd; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); gap: 10px; min-height: 0; }
+.log-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.log-wrap .log { max-height: none; }
+.board-wrap { grid-area: board; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; gap: 8px; min-width: 0; min-height: 0; }
+.stage { position: relative; min-height: 0; display: grid; place-items: center; container-type: size; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; display: grid; gap: 8px; }
+.panel h3 { font-size: 1.05rem; display: flex; justify-content: space-between; align-items: baseline; }
+.panel h3 small { font: 700 .72rem var(--body); color: var(--muted); }
+
+/* threat */
+.met { display: flex; gap: 6px; }
+.met i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--cancer); display: grid; place-items: center; font: 800 .75rem var(--display); font-style: normal; color: #ff9aa6; }
+.met i.on { background: var(--cancer); color: #fff; box-shadow: 0 0 12px var(--cancer); }
+.cap { font-size: .76rem; color: var(--muted); margin: 0; }
+.bar { height: 8px; border-radius: 99px; background: var(--navy); overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff6f86, var(--cancer)); border-radius: 99px; transition: width .4s; }
+.meter { display: grid; gap: 5px; min-width: 0; }
+.meters2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.meter-top .v { font: 800 1.05rem/1 var(--display); font-variant-numeric: tabular-nums; }
+
+/* lymph node list */
+.nodes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.nodes li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px; align-items: center; padding: 4px 6px 4px 4px; border-radius: 10px; background: var(--navy); border: 1px solid var(--line); cursor: default; }
+.nodes .ig { width: 14px; height: 14px; margin-left: 6px; border-radius: 50%; border: 3px solid var(--lymph); background: #0b0f22; }
+.nodes li.inv .ig { border-color: var(--cancer); }
+
+.nodes b { font: 800 .85rem/1.1 var(--display); display: block; }
+.nodes span { font-size: .68rem; color: var(--muted); }
+.nodes li > div { display: grid; gap: 2px; justify-items: start; min-width: 0; }
+.nodes li.inv { border-color: #e2384a88; }
+.st { font: 800 .64rem var(--body); padding: 1px 6px; border-radius: 99px; white-space: nowrap; }
+.st.ok { background: #7ef0c822; color: var(--lymph); }
+.st.bad { background: #e2384a33; color: #ff9aa6; }
+
+/* roster */
+.roster { display: grid; gap: 5px; }
+.mate { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 7px; align-items: center; text-align: left; padding: 3px 6px 3px 3px; border-radius: 10px; background: var(--navy); border: 1px solid var(--line); }
+.mate img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid var(--c); }
+.mate b { font: 800 .85rem/1.1 var(--display); color: var(--c); }
+.mate .where { display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 2px 4px; align-items: center; font-size: .68rem; color: var(--muted); }
+.mate .where .chip { font-size: .6rem; padding: 0 5px; }
+.mate.now { border-color: var(--c); box-shadow: inset 3px 0 0 var(--c); }
+.mate.pick { border-color: var(--good); box-shadow: 0 0 0 2px #5fe0b055; }
+.mate:disabled { opacity: .45; cursor: not-allowed; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.chips:empty { display: none; }
+.chip { display: inline-block; padding: 1px 7px; border-radius: 99px; background: #7ef0c822; color: var(--lymph); font: 700 .68rem/1.5 var(--body); }
+.chip.warn { background: #8a3fd633; color: #c9a8ff; }
+.chip.gold { background: #ffc85a22; color: var(--gold); }
+
+/* the board: a 2.5D tabletop. The floor is tilted back in 3D; heroes and cancer cells stand on it as
+   upright standees, so nothing is drawn over a hero's face. Sizes use cqw of the board. */
+.board { --tilt: 58deg; position: relative; width: min(100cqw, 100cqh * 16 / 9.6); aspect-ratio: 16 / 9.6; border-radius: 22px; overflow: hidden;
+  background: radial-gradient(ellipse 90% 70% at 50% 8%, #2a3466, #0b0e20 72%); box-shadow: inset 0 0 0 1px var(--line), 0 16px 50px #0009;
+  perspective: 1900px; perspective-origin: 50% 5%; container-type: inline-size; }
+.floor { position: absolute; left: 3%; width: 94%; bottom: 3%; aspect-ratio: 1 / 1.05; transform-origin: 50% 100%; transform: rotateX(var(--tilt));
+  transform-style: preserve-3d; border-radius: 3cqw; background: var(--navy) center / cover; box-shadow: 0 0 0 .5cqw #2f3866, 0 3cqw 6cqw #000c; }
+.floor::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(ellipse 75% 65% at 50% 50%, #0e1228a6, #0e1228f0); pointer-events: none; }
+.floor svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.board path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; transition: opacity .2s; }
+.board path.blood { stroke: var(--vessel); stroke-width: 4; opacity: .7; }
+.board path.lymph { stroke: var(--lymph); stroke-width: 3.5; stroke-dasharray: 1 7; opacity: .85; }
+.board path.lymph.trunk { stroke-width: 5; stroke-dasharray: 2 7; }
+.board path.new { stroke: var(--cancer); stroke-dasharray: 8 6; opacity: 1; }
+.board.focus path { opacity: .12; }
+.board.focus path.on { opacity: 1; }
+
+/* a zone is a point on the floor; its pad lies flat, its standees stand up */
+.zone { position: absolute; width: 0; height: 0; border: 0; padding: 0; background: none; transform-style: preserve-3d; transform: translateZ(2px); } /* lifted off the floor so the floor never wins the hit test */
+.zone > * { transition: opacity .2s; }
+.zone.dim > * { opacity: .25; }
+.disc { position: absolute; left: -5cqw; top: -5cqw; width: 10cqw; height: 10cqw; border-radius: 50%; background: #141a33; border: .45cqw solid #29315e;
+  display: grid; place-items: center; box-shadow: 0 0 0 .3cqw #0b0e20; transition: border-color .2s, box-shadow .2s, transform .15s; }
+.node .disc { left: -4.1cqw; top: -4.1cqw; width: 8.2cqw; height: 8.2cqw; border-color: #24564d; }
+/* one color on the board: organ icons are white line art; faint until the space matters */
+.glyph { width: 62%; height: 62%; object-fit: contain; filter: grayscale(1) brightness(1.9); opacity: .32; transition: opacity .2s; }
+.zone.lit .disc { border-color: #4d5a9c; }
+.zone.lit .glyph { opacity: 1; }
+
+
+.node.lit .disc { border-color: var(--lymph); }
+
+.node.involved .disc { border-color: var(--cancer); box-shadow: 0 0 2cqw #e2384aaa; }
+.zone.hot .disc { border-color: #ff8090; box-shadow: 0 0 2cqw #e2384a99; }
+.zone.can .disc { border-color: var(--gold); box-shadow: 0 0 0 .6cqw #ffc85a33, 0 0 2.4cqw #ffc85a88; animation: pulse 1.4s ease-in-out infinite; }
+.zone.can:hover .disc { transform: scale(1.08); }
+.zone.target .disc { border-color: var(--good); box-shadow: 0 0 0 .7cqw #5fe0b055; animation: pulse 1.1s infinite; }
+.zone.flash .disc { animation: flash .6s ease-in-out 4; }
+@keyframes flash { 50% { box-shadow: 0 0 0 1.2cqw #e2384a66, 0 0 4cqw #e2384a; } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 1cqw #ffc85a22, 0 0 3.4cqw #ffc85aaa; } }
+
+/* standees: placed by margin so the bottom-center sits on the point, then stood up around that edge */
+.up { position: absolute; transform-origin: 50% 100%; transform: rotateX(calc(-1 * var(--tilt))); }
+.sd { width: 7.4cqw; height: 9.4cqw; margin-left: -3.7cqw; margin-top: -9.4cqw; border-radius: 3.7cqw 3.7cqw .9cqw .9cqw; overflow: hidden;
+  border: .45cqw solid var(--c); background: var(--navy); box-shadow: 0 0 0 .25cqw #f3ecdf55; }
+.sd img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; display: block; }
+.sd.me { border-color: var(--gold); box-shadow: 0 0 0 .3cqw var(--c), 0 0 2.6cqw #ffc85aaa; }
+.base { position: absolute; width: 7cqw; height: 7cqw; margin: -3.5cqw 0 0 -3.5cqw; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--c) 70%, transparent) 30%, transparent 70%); }
+.base.me { background: radial-gradient(circle, #ffc85acc 25%, transparent 70%); animation: glow 1.4s ease-in-out infinite; }
+@keyframes glow { 50% { opacity: .55; } }
+.ct { width: 3cqw; height: 3cqw; margin-left: -1.5cqw; margin-top: -3cqw; border-radius: 50%; overflow: hidden; border: .3cqw solid #ff6f86; background: var(--navy); }
+.ct.h { border-color: #9a6bff; }
+.ct img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.anchor { width: 0; height: 0; }
+.name { position: absolute; left: 0; bottom: 0; transform: translateX(-50%); font: 800 max(9px, 1.7cqw)/1 var(--display); padding: .45cqw .9cqw; border-radius: .6cqw; background: #0b0f22e6; color: var(--text); white-space: nowrap; }
+.toks { position: absolute; right: 0; bottom: 0; display: grid; gap: .3cqw; justify-items: end; }
+.node .name { color: var(--lymph); }
+.node.involved .name { color: #ff9aa6; }
+.tok { font: 800 max(8px, 1.3cqw)/1 var(--body); padding: .4cqw .7cqw; border-radius: 99px; color: #fff; white-space: nowrap; }
+.tok.shield { background: #8a3fd6; } .tok.treg { background: #4f7a5a; }
+
+.legend { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; font-size: .7rem; color: var(--muted); background: #0b0e20cc; padding: 3px 10px; border-radius: 99px; pointer-events: none; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 3px solid var(--vessel); }
+.legend i.l { border-top: 3px dotted var(--lymph); }
+.legend img { width: 14px; height: 14px; border-radius: 50%; }
+
+/* command panel */
+.me-card { background: var(--panel); border: 2px solid var(--c, var(--line)); border-radius: var(--r); padding: 10px; display: grid; grid-template-columns: 56px 1fr; gap: 10px; }
+.me-card img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--navy); }
+.me-card h3 { font-size: 1.15rem; color: var(--c); }
+.me-card p { margin: 2px 0 0; font-size: .74rem; color: var(--muted); }
+.me-card p b { color: var(--text); font-weight: 700; }
+.pips { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; margin-top: 6px; font-size: .76rem; color: var(--muted); }
+.pips i { width: 14px; height: 14px; border-radius: 4px; background: var(--gold); box-shadow: 0 0 8px #ffc85a88; }
+.pips i.off { background: transparent; border: 2px solid var(--line); box-shadow: none; }
+.pips .ex { background: #8a3fd6; box-shadow: none; border-radius: 50%; }
+.inspect { background: var(--navy); border: 1px dashed var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: start; min-height: 74px; }
+.inspect > .ig { width: 44px; height: 44px; border-radius: 10px; background: #0b0f22; display: grid; place-items: center; }
+.inspect > .ig.node { border-radius: 50%; border: 4px solid var(--lymph); }
+.ig .glyph { width: 80%; height: 80%; opacity: 1; }
+
+.tcard .ig { width: 64px; height: 64px; border-radius: 10px; background: #0b0f22; display: grid; place-items: center; }
+.inspect h4 { margin: 0; font: 800 1rem/1.15 var(--display); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.inspect p { margin: 2px 0 0; font-size: .78rem; color: var(--muted); }
+.inspect p b { color: var(--text); }
+.inspect .kind { font: 700 .68rem var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; min-height: 48px; }
+.actions .act { flex: 1 1 120px; max-width: 200px; }
+.actions .act.end { margin-left: auto; flex: 0 1 200px; }
+.act-note { margin: 0; align-self: center; font-size: .8rem; color: var(--muted); }
+.act { text-align: left; padding: 6px 9px; border-radius: 11px; background: var(--navy); border: 1px solid var(--line); display: grid; gap: 1px; }
+.act b { font: 800 .95rem/1.15 var(--display); }
+.act span { font-size: .66rem; color: var(--muted); line-height: 1.2; }
+.act:not(:disabled):hover { border-color: var(--gold); }
+.act:disabled { opacity: .45; cursor: not-allowed; }
+.act:disabled span { color: #c9b7ff; }
+.act.end { grid-column: auto; background: linear-gradient(180deg, #ff6f86, var(--cancer)); border: 0; color: #fff; box-shadow: 0 4px 0 #8c1a2a; }
+.act.end span { color: #ffe3e6; }
+.hand { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 6px; }
+.card { border-radius: 11px; overflow: hidden; background: var(--navy); border: 1px solid #ffc85a55; text-align: left; padding: 0; display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; }
+.card img { width: 54px; height: 100%; min-height: 54px; object-fit: cover; display: block; }
+.card div { padding: 5px 8px; display: grid; gap: 1px; }
+.card b { font: 800 .9rem/1.1 var(--display); color: var(--gold); }
+.card span { font-size: .68rem; line-height: 1.25; color: var(--muted); }
+.card:disabled { opacity: .45; cursor: not-allowed; }
+.card.sel { outline: 3px solid var(--good); }
+.hint { min-height: 1.2em; font-size: .82rem; color: var(--good); font-weight: 700; }
+.log { margin-top: 4px; min-height: 0; background: var(--navy); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; max-height: 150px; overflow: auto; font-size: .78rem; display: grid; gap: 3px; align-content: start; }
+.log p { margin: 0; color: var(--muted); }
+.log p.bad, .log p.mutation, .log p.lose { color: #ff9aa6; }
+.log p.attack, .log p.win, .log p.present { color: var(--good); }
+.log p.card { color: var(--gold); }
+.rules-sheet ol { padding-left: 1.2em; display: grid; gap: 6px; margin: 0; }
+.rules-sheet b { color: var(--gold); }
+
+@media (max-width: 1200px) {
+  /* two columns: the right column stacks your turn over the situation; each scrolls inside itself if needed */
+  .table { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "board cmd" "board rail"; grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .cmd { overflow: auto; grid-template-rows: none; grid-auto-rows: max-content; align-content: start; }
+  .log-wrap .log { max-height: 120px; }
+  .setup { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  /* phones: one column, the page scrolls */
+  body.playing .wrap { height: auto; }
+  body.playing #game { height: auto; }
+  body.playing .table { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-areas: "board" "cmd" "rail"; grid-template-rows: none; }
+  .board-wrap { grid-template-rows: none; }
+  .stage { gap: 6px; }
+  .legend { position: static; transform: none; order: -1; background: none; padding: 0; }
+  .cmd { grid-template-rows: none; }
+  .stage { container-type: inline-size; }
+  .board { width: 100%; }
+  .cmd { max-height: none; overflow: visible; }
+  .log-wrap .log { max-height: 160px; }
+  .rail { grid-template-columns: 1fr; }
+  .team { grid-template-columns: repeat(2, 1fr); }
+  .turn { margin-right: 0; order: 3; width: 100%; }
+  .board { aspect-ratio: 1 / .8; --tilt: 48deg; perspective-origin: 50% 0%; }
+  .floor { left: 3%; width: 94%; }
+}
+
+/* ---------- overlays ---------- */
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: #070914cc; backdrop-filter: blur(4px); }
+.sheet { width: min(560px, 100%); max-height: 92vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 18px; display: grid; gap: 14px; box-shadow: 0 30px 80px #000c; animation: rise .25s ease-out; }
+.sheet > * { min-width: 0; }
+.sheet.wide { width: min(820px, 100%); }
+@keyframes rise { from { transform: translateY(14px) scale(.98); opacity: .4; } }
+.sheet img.art { width: 100%; max-width: 100%; border-radius: 14px; display: block; }
+.sheet h2 { font-size: 1.8rem; }
+.sheet p { margin: 0; }
+.tumor-list { display: grid; gap: 8px; }
+.tcard { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; padding: 8px; border-radius: 12px; background: var(--navy); border: 1px solid var(--line); animation: rise .3s ease-out both; }
+.tcard img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; }
+.tcard b { font-family: var(--display); font-size: 1.05rem; }
+.tcard p { font-size: .82rem; color: var(--muted); }
+.tcard.bad { border-color: #e2384a88; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 520px) { .sheet .banner { grid-template-columns: 84px 1fr !important; } .sheet h2 { font-size: 1.45rem; } }
+
+/* ---------- welcome ---------- */
+#welcome { display: grid; gap: 20px; }
+.hero { max-height: none; min-height: 420px; }
+.logo .kicker { color: var(--gold); margin-bottom: 8px; }
+/* three equal buttons: same width, height and type size */
+.cta { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 210px)); gap: 12px; margin-top: 18px; }
+.cta > button { height: 60px; padding: 0 14px; font: 800 1.25rem/1 var(--display); white-space: nowrap; }
+.big.alt { background: linear-gradient(180deg, #5fe8e0, var(--killer_t)); color: var(--ink); box-shadow: 0 6px 0 #1a7c77; }
+.big.alt:active { box-shadow: 0 3px 0 #1a7c77; }
+.big.dark { background: #0e1228e6; color: var(--text); border: 2px solid #3a4580; box-shadow: 0 6px 0 #070914; }
+.big.dark:active { box-shadow: 0 3px 0 #070914; }
+.pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.pillars article { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; }
+.pillars img { width: 96px; height: 96px; border-radius: 12px; object-fit: cover; }
+.pillars h3 { font-size: 1.25rem; margin: 4px 0 2px; }
+.pillars p { margin: 0; font-size: .86rem; color: var(--muted); }
+.setup-head { display: flex; align-items: center; gap: 14px; }
+.setup-head h2 { font-size: 1.8rem; }
+#start { display: grid; gap: 16px; }
+
+/* ---------- tutorial coach ---------- */
+.coach { position: fixed; z-index: 40; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow: auto; display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 14px; border-radius: 18px; background: #232c5a; border: 2px solid var(--dendritic); box-shadow: 0 20px 60px #000c; animation: rise .25s ease-out; }
+.coach > img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--dendritic); background: var(--navy); }
+.coach-body { display: grid; gap: 8px; min-width: 0; }
+.coach p { margin: 0; font-size: .95rem; line-height: 1.4; }
+.coach p b { color: var(--gold); }
+.coach-bio { display: grid; gap: 3px; padding: 8px 10px; border-radius: 10px; background: #141a3a; border: 1px solid #3a4580; }
+.coach-bio .label { color: var(--lymph); }
+.coach-bio p { font-size: .82rem; line-height: 1.4; color: #cfd2ea; }
+.coach-btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.big.small { padding: 8px 16px; font-size: 1rem; box-shadow: 0 4px 0 #8c1a2a; }
+.coach.shake { animation: shake .35s; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.coach-target { outline: 3px solid var(--gold) !important; outline-offset: 3px; border-radius: 12px; animation: beacon 1.2s ease-in-out infinite; position: relative; z-index: 5; }
+.zone.coach-target { outline: none !important; position: absolute; z-index: auto; animation: none; }
+.zone.coach-target .disc { outline: 5px solid var(--text); outline-offset: 5px; animation: beacon-w 1.1s ease-in-out infinite; }
+@keyframes beacon-w { 50% { outline-color: #f3ecdf33; } }
+@keyframes beacon { 50% { outline-color: #ffc85a44; } }
+@media (max-width: 1000px) { .pillars { grid-template-columns: 1fr; } }
+@media (max-width: 620px) {
+  .hero { aspect-ratio: auto; min-height: 560px; background-position: 70% center; }
+  .coach { left: 16px; right: 16px; width: auto; grid-template-columns: 44px 1fr; padding: 12px; }
+  .coach > img { width: 44px; height: 44px; }
+  .coach p { font-size: .88rem; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <section id="welcome">
+    <div class="hero" id="hero">
+      <div class="logo">
+        <div class="label kicker">A co-op game for 1–4 players</div>
+        <h1>Immune <span>Response</span></h1>
+        <p>You command four immune cells. Find the cancer, destroy it, and stop it before it spreads.</p>
+        <div class="cta">
+          <button class="big" id="learn">Learn to play</button>
+          <button class="big alt" id="playnow">Play now</button>
+          <button class="big dark" id="resume" hidden>Resume game</button>
+        </div>
+      </div>
+    </div>
+    <div class="pillars">
+      <article><img src="art/cancer_hidden.webp?v=3" alt=""><div><div class="label">1 · Find</div><h3>Cancer hides</h3><p>Every cancer cell starts hidden. The Dendritic Cell scans to reveal them, then carries their antigen to a lymph node to activate the Killer T cell.</p></div></article>
+      <article><img src="art/killer_t.webp?v=2" alt=""><div><div class="label">2 · Destroy</div><h3>Pick the right cell</h3><p>Killer T cells and Macrophages hit revealed cells. The NK cell hunts the hidden ones.</p></div></article>
+      <article><img src="art/mut_angio.webp?v=2" alt=""><div><div class="label">3 · Contain</div><h3>Stop the spread</h3><p>Tumors drain into the nearest lymph node first. Clear the nodes, or cancer breaks out across the body.</p></div></article>
+    </div>
+  </section>
+
+  <section id="start" hidden>
+    <div class="setup-head">
+      <button class="ghost" id="back">Back</button>
+      <h2>Choose your difficulty</h2>
+    </div>
+    <div class="setup">
+      <div class="team" id="team"></div>
+      <div class="box">
+        <div class="label">Difficulty</div>
+        <div class="seg" id="diff"></div>
+        <button class="big" id="go">Start the hunt</button>
+        <div class="rules" id="rules-text">
+          <div class="label">How a turn works</div>
+          <ol>
+            <li>The active cell gets <b>4 actions</b>. Click a glowing zone to <b>move</b> along a blood vessel or a lymph vessel.</li>
+            <li>Cancer cells start <b>hidden</b>. The <b>NK cell</b> kills hidden cells. <b>Scan</b> to reveal cells for the <b>Killer T cell</b> and the <b>Macrophage</b>.</li>
+            <li>Play <b>cytokine cards</b> any time. They cost no action.</li>
+            <li><b>Present</b> in a clean lymph node: the Dendritic Cell activates the Killer T cell for 2 extra actions.</li>
+            <li>Then the cancer acts. It grows and mutates. Overflowing tumors drain into their lymph node, and an involved node lets cells <b>break out</b> to other regions.</li>
+          </ol>
+          <p><b>Win</b> when no cancer cell is left in any tissue or lymph node. <b>Lose</b> if breakouts fill the metastasis track, the 40 cancer cells run out, or the tumor deck runs out a third time.</p>
+          <p>Everyone plays one shared screen. With friends, each person takes one or more cells.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <header class="gbar">
+      <div class="brand">Immune <span>Response</span></div>
+      <div class="turn" id="turn"></div>
+      <button class="ghost" id="rulesbtn">Rules</button>
+      <button class="ghost" id="quit">New game</button>
+    </header>
+    <div class="table">
+      <aside class="rail" aria-label="Situation">
+        <section class="panel">
+          <h3>Cancer threat <small id="s-round"></small></h3>
+          <div class="meter">
+            <div class="meter-top"><span class="label">Metastasis</span><span class="cap" id="s-metcap"></span></div>
+            <div class="met" id="s-met"></div>
+          </div>
+          <div class="meters2">
+            <div class="meter">
+              <div class="meter-top"><span class="label">Cells</span><span class="v" id="s-cells"></span></div>
+              <div class="bar"><i id="s-cellbar"></i></div>
+            </div>
+            <div class="meter">
+              <div class="meter-top"><span class="label">Deck</span><span class="v" id="s-deck"></span></div>
+              <div class="bar"><i id="s-deckbar"></i></div>
+              <p class="cap" id="s-rate" hidden></p>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <h3>Lymph nodes <small>point to see a region</small></h3>
+          <ul class="nodes" id="nodes"></ul>
+        </section>
+        <section class="panel">
+          <h3>Your team</h3>
+          <div class="roster" id="mates"></div>
+        </section>
+      </aside>
+      <div class="board-wrap">
+        <div class="stage">
+          <div class="board" id="board"></div>
+          <div class="legend">
+            <span><i></i>Blood vessel</span>
+            <span><i class="l"></i>Lymph vessel</span>
+            <span><img src="art/cancer_hidden.webp?v=3" alt="">Hidden cell</span>
+            <span><img src="art/cancer.webp?v=3" alt="">Revealed cell</span>
+          </div>
+        </div>
+        <div class="actions" id="actions"></div>
+        <div class="hand" id="hand" aria-label="Cytokine cards"></div>
+      </div>
+      <aside class="cmd" aria-label="Your turn">
+        <div class="me-card" id="me"></div>
+        <div class="inspect" id="inspect" aria-live="polite"></div>
+        <div class="hint" id="hint"></div>
+        <section class="log-wrap"><div class="label">Body events</div><div class="log" id="log" aria-live="polite"></div></section>
+      </aside>
+    </div>
+  </section>
+</div>
+<div class="overlay" id="overlay" hidden><div class="sheet" id="sheet"></div></div>
+<aside class="coach" id="coach" hidden aria-live="polite">
+  <img src="art/dendritic.webp?v=2" alt="">
+  <div class="coach-body">
+    <div class="label" id="coach-step"></div>
+    <p id="coach-text"></p>
+    <div class="coach-bio" id="coach-bio" hidden><span class="label">In the body</span><p id="coach-bio-text"></p></div>
+    <div class="coach-btns"><button class="ghost" id="coach-skip">Skip tutorial</button><button class="big small" id="coach-next">Next</button></div>
+  </div>
+</aside>
+
+<script type="module" src="js/ui.js?v=35"></script>
