@@ -68,6 +68,7 @@ function begin(state) {
 function show(which) {
   for (const id of ['welcome', 'start', 'game']) $(id).hidden = which !== id;
   document.body.classList.toggle('playing', which === 'game');
+  document.body.dataset.screen = which;
   if (which === 'start') renderStart();
   if (which === 'welcome') renderWelcome();
   if (which !== 'game') $('coach').hidden = true;
